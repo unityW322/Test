@@ -10,41 +10,54 @@ public class Plane : MonoBehaviour
 
     [SerializeField] private BallController playerController;
 
-    [SerializeField] private SpriteRenderer StartSprite;
-    [SerializeField] private SpriteRenderer EndSprite;
+    [SerializeField] private FinishLine end;
 
-    [SerializeField] private PlaneEndFlag flag;
+    [SerializeField] private List<Pack> packs;
 
     private bool isExitTriggered;
     private bool isMovementTriggered;
 
+    public Action OnPlaneIsAboutToEnd;
+
     public Action OnFallDown;
+    public Action OnFinish;
 
     private void Start()
     {
-        flag.OnFlagReached += StartMovement;
+        end.OnFinish += () => OnFinish.Invoke();
     }
 
-    //private void OnCollisionExit(Collision collision)
-    //{
-    //    if (!isExitTriggered && collision.gameObject == playerController.gameObject)
-    //    {
-    //        isExitTriggered = true;
+    private void OnCollisionExit(Collision collision)
+    {
+        if (!isExitTriggered && collision.gameObject == playerController.gameObject)
+        {
+            isExitTriggered = true;
 
-    //        Debug.LogError("You are dead");
-    //        playerController.FallDown();
+            Debug.LogError("You are dead");
+            playerController.FallDown();
 
-    //        OnFallDown.Invoke();
-    //    }
-    //}
+            OnFallDown.Invoke();
+        }
+    }
 
     private void FixedUpdate()
     {
         if (isMovementTriggered)
+        {
             transform.position += -Vector3.forward * Time.deltaTime * movespeed;
+
+            float isAboutToLeavePlane = transform.position.z % 45;
+            if (OnPlaneIsAboutToEnd != null && isAboutToLeavePlane <= -30)
+            {
+                OnPlaneIsAboutToEnd.Invoke();
+                OnPlaneIsAboutToEnd = null;
+            }
+            else if (isAboutToLeavePlane <= -50f)
+                gameObject.SetActive(false);
+        }
     }
 
-    private void StartMovement(Vector3 prev)
+    public void StartMovement(Vector3 prev)
     {
         isMovementTriggered = true;
 
@@ -52,13 +65,34 @@ public class Plane : MonoBehaviour
             return;
 
         Vector3 targetPosition = prev;
-        targetPosition.z += prev.z * 10f;
+        targetPosition.z += 50;
 
         transform.position = targetPosition;
+
+        PickRandomPackToGenerate();
+    }
+
+    private void PickRandomPackToGenerate()
+    {
+        int randomIndex = UnityEngine.Random.Range(0, packs.Count);
+
+        for (int i = 0; i < packs.Count; i++)
+        {
+            Pack pack = packs[i];
+
+            bool isChosenPack = i == randomIndex;
+
+            if (isChosenPack)
+                pack.GenerateObsticles();
+
+            pack.gameObject.SetActive(isChosenPack);
+        }
     }
 
     public void StartMovement()
     {
         isMovementTriggered = true;
+
+        PickRandomPackToGenerate();
     }
 }
